@@ -1,4 +1,6 @@
+'use client';
 import { useState, useEffect } from 'react';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface Service {
   id: string;
@@ -33,8 +35,24 @@ export default function ServiceDetails({
 }: ServiceDetailsProps) {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [statsTab, setStatsTab] = useState<'24h' | '7j'>('24h');
+  const [stats7j, setStats7j] = useState<{ label: string; uptime: number | null }[]>([]);
+  const [stats24h, setStats24h] = useState<{ label: string; uptime: number | null; avgResponse: number | null }[]>([]);
 
-  // Charger l'historique au démarrage et le rafraîchir toutes les 10 secondes
+  useEffect(() => {
+    const fetchStats = async () => {
+      const [r7j, r24h] = await Promise.all([
+        fetch(`/api/history/${service.id}/stats`),
+        fetch(`/api/history/${service.id}/stats/hourly`),
+      ]);
+      if (r7j.ok) setStats7j(await r7j.json());
+      if (r24h.ok) setStats24h(await r24h.json());
+    };
+    fetchStats();
+    const interval = setInterval(fetchStats, 15000);
+    return () => clearInterval(interval);
+  }, [service.id]);
+
   useEffect(() => {
     const fetchHistory = async () => {
       try {
@@ -49,12 +67,8 @@ export default function ServiceDetails({
         setLoadingHistory(false);
       }
     };
-
     fetchHistory();
-
-    // Refresh toutes les 10 secondes
     const interval = setInterval(fetchHistory, 10000);
-
     return () => clearInterval(interval);
   }, [service.id]);
 
@@ -87,155 +101,220 @@ export default function ServiceDetails({
 
   const config = statusColor[service.status];
 
+  const avgUptime = (() => {
+    const data = statsTab === '7j' ? stats7j : stats24h;
+    const valid = data.filter(s => s.uptime !== null);
+    if (!valid.length) return null;
+    return Math.round(valid.reduce((a, s) => a + (s.uptime ?? 0), 0) / valid.length);
+  })();
+
   return (
     <>
-      {/* Overlay ultra-transparent - juste pour le clic */}
-      <div 
-        className="fixed inset-0 z-30 transition-opacity"
+      {/* Overlay */}
+      <div
+        className="fixed inset-0 z-30"
         onClick={onClose}
         style={{ backgroundColor: 'rgba(0, 0, 0, 0)' }}
       />
 
-      {/* Bulle qui s'agrandit */}
-      <div 
-        className="fixed inset-0 flex items-center justify-center z-40 pointer-events-none"
-      >
+      {/* Bulle centrée, scrollable sur mobile */}
+      <div className="fixed inset-0 z-40 flex items-center justify-center pointer-events-none sm:pl-48 px-3 py-4">
         <div
-          className={`${config.bg} rounded-3xl p-8 shadow-2xl max-w-2xl w-11/12 border-4 ${config.borderColor} pointer-events-auto`}
+          className={`${config.bg} rounded-3xl shadow-2xl border-4 ${config.borderColor} pointer-events-auto w-full max-w-4xl flex flex-col`}
           style={{
             animation: 'bubbleGrow 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
-            transformOrigin: 'center center',
+            maxHeight: 'calc(100vh - 2rem)',
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Header avec bouton fermer */}
-          <div className="flex justify-between items-start mb-6">
-            <div className="flex-1">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">{service.name}</h1>
-              <p className="text-sm text-gray-800 break-all">{service.url}</p>
-            </div>
-            <button
-              onClick={onClose}
-              className="text-gray-900 hover:bg-black hover:bg-opacity-20 rounded-full p-2 text-2xl flex-shrink-0 ml-4"
-            >
-              ✕
-            </button>
-          </div>
+          {/* Scrollable content */}
+          <div className="overflow-y-auto flex-1 p-5 sm:p-6" style={{ scrollbarWidth: 'thin' }}>
 
-          {/* Statut Badge */}
-          <div className="mb-6">
-            <span className="bg-white text-gray-800 font-bold px-6 py-2 rounded-full text-lg inline-block">
-              {config.text}
-            </span>
-          </div>
+            {/* Header */}
+            <div className="flex justify-between items-center mb-3">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                {(() => {
+                  try {
+                    return (
+                      <img
+                        src={`https://www.google.com/s2/favicons?domain=${new URL(service.url).hostname}&sz=32`}
+                        alt=""
+                        width={24}
+                        height={24}
+                        className="rounded-sm flex-shrink-0"
+                      />
+                    );
+                  } catch { return null; }
+                })()}
+                <div className="min-w-0">
+                  <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">{service.name}</h1>
+                  <p className="text-xs text-gray-700 truncate">{service.url}</p>
+                </div>
+                <span className="bg-white text-gray-800 font-bold px-4 py-1 rounded-full text-sm flex-shrink-0">
+                  {config.text}
+                </span>
+              </div>
+              <button
+                onClick={onClose}
+                className="text-gray-900 hover:bg-black hover:bg-opacity-20 rounded-full p-2 text-lg flex-shrink-0 ml-3"
+              >
+                ✕
+              </button>
+            </div>
 
-          {/* Info Row */}
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <div className="bg-white bg-opacity-30 rounded-lg p-4 text-gray-900">
-              <p className="text-xs font-semibold text-gray-800">Dernier check</p>
-              <p className="text-xl font-bold">{formatTime(service.lastCheck)}</p>
-            </div>
-            <div className="bg-white bg-opacity-30 rounded-lg p-4 text-gray-900">
-              <p className="text-xs font-semibold text-gray-800">Temps réponse</p>
-              <p className="text-xl font-bold">
-                {service.responseTime ? `${service.responseTime}ms` : '—'}
-              </p>
-            </div>
-          </div>
+            {/* Layout 2 colonnes sur desktop */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
-          {/* Historique style Datadog */}
-          <div className="rounded-lg mb-6 overflow-hidden border border-gray-700" style={{ background: '#0f1117' }}>
-            {/* Toolbar */}
-            <div className="flex items-center justify-between px-4 py-2 border-b border-gray-700" style={{ background: '#161b22' }}>
-              <span className="text-xs font-mono font-semibold text-gray-400 uppercase tracking-widest">Logs</span>
-              <span className="text-xs font-mono text-gray-500">{history.length} events</span>
-            </div>
-            {/* Log lines */}
-            <div className="max-h-48 overflow-y-auto font-mono text-xs">
-              {loadingHistory ? (
-                <div className="px-4 py-3 text-gray-500">Chargement...</div>
-              ) : history.length === 0 ? (
-                <div className="px-4 py-3 text-gray-500">No logs found</div>
-              ) : (
-                history.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center gap-3 px-4 py-1.5 border-b border-gray-800 hover:bg-white hover:bg-opacity-5 transition-colors"
-                  >
-                    {/* Barre de couleur latérale */}
-                    <div className={`w-0.5 self-stretch rounded-full flex-shrink-0 ${item.status === 'success' ? 'bg-green-500' : 'bg-red-500'}`} />
-                    {/* Timestamp */}
-                    <span className="text-gray-500 flex-shrink-0 w-36">{formatHistoryTimestamp(item.timestamp)}</span>
-                    {/* Niveau */}
-                    <span className={`flex-shrink-0 px-1.5 py-0.5 rounded text-xs font-bold uppercase ${item.status === 'success' ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}`}>
-                      {item.status === 'success' ? 'OK' : 'ERR'}
-                    </span>
-                    {/* Message */}
-                    <span className="text-gray-300 flex-1">
-                      {item.status === 'success'
-                        ? `Health check passed — ${service.url}`
-                        : `Health check failed — ${service.url}`}
-                    </span>
-                    {/* Response time */}
-                    {item.responseTime != null && (
-                      <span className="text-gray-500 flex-shrink-0">{item.responseTime}ms</span>
+              {/* Colonne gauche : info + logs */}
+              <div className="flex flex-col gap-3">
+                {/* Info row */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-white bg-opacity-30 rounded-xl p-3 text-gray-900">
+                    <p className="text-xs font-semibold text-gray-700">Dernier check</p>
+                    <p className="text-base font-bold">{formatTime(service.lastCheck)}</p>
+                  </div>
+                  <div className="bg-white bg-opacity-30 rounded-xl p-3 text-gray-900">
+                    <p className="text-xs font-semibold text-gray-700">Temps réponse</p>
+                    <p className="text-base font-bold">
+                      {service.responseTime ? `${service.responseTime}ms` : '—'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Logs style Datadog */}
+                <div className="rounded-lg overflow-hidden border border-gray-700 flex-1" style={{ background: '#0f1117' }}>
+                  <div className="flex items-center justify-between px-3 py-2 border-b border-gray-700" style={{ background: '#161b22' }}>
+                    <span className="text-xs font-mono font-semibold text-gray-400 uppercase tracking-widest">Logs</span>
+                    <span className="text-xs font-mono text-gray-500">{history.length} events</span>
+                  </div>
+                  <div className="max-h-52 overflow-y-auto font-mono text-xs">
+                    {loadingHistory ? (
+                      <div className="px-3 py-2 text-gray-500">Chargement...</div>
+                    ) : history.length === 0 ? (
+                      <div className="px-3 py-2 text-gray-500">No logs found</div>
+                    ) : (
+                      history.map((item) => (
+                        <div
+                          key={item.id}
+                          className="flex items-center gap-2 px-3 py-1.5 border-b border-gray-800 hover:bg-white hover:bg-opacity-5"
+                        >
+                          <div className={`w-0.5 self-stretch rounded-full flex-shrink-0 ${item.status === 'success' ? 'bg-green-500' : 'bg-red-500'}`} />
+                          <span className="text-gray-500 flex-shrink-0 w-32">{formatHistoryTimestamp(item.timestamp)}</span>
+                          <span className={`flex-shrink-0 px-1 py-0.5 rounded text-xs font-bold ${item.status === 'success' ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}`}>
+                            {item.status === 'success' ? 'OK' : 'ERR'}
+                          </span>
+                          <span className="text-gray-300 flex-1 truncate">
+                            {item.status === 'success' ? 'Health check passed' : 'Health check failed'}
+                          </span>
+                          {item.responseTime != null && (
+                            <span className="text-gray-500 flex-shrink-0">{item.responseTime}ms</span>
+                          )}
+                        </div>
+                      ))
                     )}
                   </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Graphique simple */}
-          <div className="bg-white bg-opacity-30 rounded-lg p-4 mb-6 text-gray-900">
-            <h2 className="font-bold text-lg mb-3">Disponibilité (7j)</h2>
-            <div className="flex items-end justify-between h-20 gap-1">
-              {[85, 60, 90, 75, 95, 88, 92].map((percent, idx) => (
-                <div key={idx} className="flex-1 flex flex-col items-center gap-1">
-                  <div
-                    className="w-full bg-gray-900 opacity-40 rounded-t"
-                    style={{ height: `${percent}%`, minHeight: '4px' }}
-                  ></div>
-                  <span className="text-xs font-semibold">{percent}%</span>
                 </div>
-              ))}
-            </div>
-          </div>
+              </div>
 
-          {/* Boutons d'actions */}
-          <div className="flex gap-3">
-            <button
-              onClick={onEdit}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm"
-            >
-              Editer
-            </button>
-            <button
-              onClick={onDelete}
-              className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm"
-            >
-              Supprimer
-            </button>
-            <button
-              onClick={onClose}
-              className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm"
-            >
-              Fermer
-            </button>
+              {/* Colonne droite : graphiques */}
+              <div className="bg-white bg-opacity-30 rounded-xl p-3 text-gray-900">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex gap-1 bg-white bg-opacity-40 rounded-lg p-1">
+                    {(['24h', '7j'] as const).map(tab => (
+                      <button
+                        key={tab}
+                        onClick={() => setStatsTab(tab)}
+                        className={`px-3 py-1 rounded-md text-sm font-bold transition-colors ${statsTab === tab ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-white hover:bg-opacity-50'}`}
+                      >
+                        {tab}
+                      </button>
+                    ))}
+                  </div>
+                  {avgUptime !== null && (
+                    <span className="text-sm font-bold">{avgUptime}% moy.</span>
+                  )}
+                </div>
+
+                {/* Graphe uptime */}
+                {(() => {
+                  const data = statsTab === '7j' ? stats7j : stats24h;
+                  if (!data.length) return <p className="text-sm text-gray-700">Pas encore de données</p>;
+                  return (
+                    <ResponsiveContainer width="100%" height={120}>
+                      <AreaChart data={data} margin={{ top: 4, right: 4, left: -28, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="uptimeGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#1d4ed8" stopOpacity={0.5} />
+                            <stop offset="95%" stopColor="#1d4ed8" stopOpacity={0.02} />
+                          </linearGradient>
+                        </defs>
+                        <XAxis dataKey="label" tick={{ fontSize: 9 }} tickLine={false} axisLine={false} interval={statsTab === '24h' ? 3 : 0} />
+                        <YAxis domain={[0, 100]} tick={{ fontSize: 9 }} tickLine={false} axisLine={false} />
+                        <Tooltip
+                          formatter={(v) => v != null ? `${v}%` : 'N/A'}
+                          contentStyle={{ borderRadius: '8px', fontSize: '12px', border: 'none', background: 'rgba(255,255,255,0.95)' }}
+                        />
+                        <Area type="monotone" dataKey="uptime" stroke="#1d4ed8" strokeWidth={2} fill="url(#uptimeGrad)" connectNulls dot={{ fill: '#1d4ed8', r: 2 }} activeDot={{ r: 4 }} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  );
+                })()}
+
+                {/* Graphe temps de réponse (24h seulement) */}
+                {statsTab === '24h' && stats24h.some(s => s.avgResponse != null) && (
+                  <>
+                    <p className="text-xs font-bold text-gray-600 mt-2 mb-1">Temps de réponse moyen (ms)</p>
+                    <ResponsiveContainer width="100%" height={80}>
+                      <AreaChart data={stats24h} margin={{ top: 4, right: 4, left: -28, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="respGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#059669" stopOpacity={0.5} />
+                            <stop offset="95%" stopColor="#059669" stopOpacity={0.02} />
+                          </linearGradient>
+                        </defs>
+                        <XAxis dataKey="label" tick={{ fontSize: 9 }} tickLine={false} axisLine={false} interval={3} />
+                        <YAxis tick={{ fontSize: 9 }} tickLine={false} axisLine={false} />
+                        <Tooltip
+                          formatter={(v) => v != null ? `${v}ms` : 'N/A'}
+                          contentStyle={{ borderRadius: '8px', fontSize: '12px', border: 'none', background: 'rgba(255,255,255,0.95)' }}
+                        />
+                        <Area type="monotone" dataKey="avgResponse" stroke="#059669" strokeWidth={2} fill="url(#respGrad)" connectNulls dot={false} activeDot={{ r: 4 }} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={onEdit}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-3 rounded-lg transition-colors text-sm"
+              >
+                Editer
+              </button>
+              <button
+                onClick={onDelete}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-3 rounded-lg transition-colors text-sm"
+              >
+                Supprimer
+              </button>
+              <button
+                onClick={onClose}
+                className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-3 rounded-lg transition-colors text-sm"
+              >
+                Fermer
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
       <style>{`
         @keyframes bubbleGrow {
-          from {
-            transform: scale(0.3);
-            opacity: 0;
-          }
-          to {
-            transform: scale(1);
-            opacity: 1;
-          }
+          from { transform: scale(0.3); opacity: 0; }
+          to   { transform: scale(1);   opacity: 1; }
         }
       `}</style>
     </>

@@ -1,11 +1,20 @@
 interface ServiceCardProps {
   name: string;
+  url: string;
   status: 'active' | 'inactive' | 'unknown';
   responseTime?: number | null;
   lastCheck?: string | null;
 }
 
-export default function ServiceCard({ name, status, responseTime, lastCheck }: ServiceCardProps) {
+export default function ServiceCard({ name, url, status, responseTime, lastCheck }: ServiceCardProps) {
+  const faviconUrl = (() => {
+    try {
+      const domain = new URL(url).hostname;
+      return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+    } catch {
+      return null;
+    }
+  })();
   const statusConfig = {
     active: {
       bg: 'bg-green-400',
@@ -41,13 +50,14 @@ export default function ServiceCard({ name, status, responseTime, lastCheck }: S
 
   return (
     <div
-      className={`${config.bg} rounded-3xl p-8 shadow-lg min-h-48 flex flex-col justify-between border-4 ${config.borderColor} cursor-pointer hover:shadow-xl transition-shadow`}
+      className={`${config.bg} rounded-2xl md:rounded-3xl p-4 sm:p-6 md:p-8 shadow-lg min-h-36 sm:min-h-44 md:min-h-48 flex flex-col justify-between border-4 ${config.borderColor} cursor-pointer hover:shadow-xl transition-shadow`}
     >
       {/* Titre */}
-      <div>
-        <h3 className={`font-bold text-2xl ${config.textColor}`}>
-          {name}
-        </h3>
+      <div className="flex items-center gap-3">
+        {faviconUrl && (
+          <img src={faviconUrl} alt="" width={24} height={24} className="rounded-sm flex-shrink-0" />
+        )}
+        <h3 className={`font-bold text-lg sm:text-xl md:text-2xl ${config.textColor} leading-tight`}>{name}</h3>
       </div>
 
       {/* Statut et informations */}

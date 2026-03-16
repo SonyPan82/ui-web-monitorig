@@ -7,6 +7,9 @@ import MonitoringDashboard from '@/components/MonitoringDashboard';
 import Modal from '@/components/Modal';
 import ServiceForm from '@/components/ServiceForm';
 import ServiceDetails from '@/components/ServiceDetails';
+import LoginScreen from '@/components/LoginScreen';
+import SettingsPage from '@/components/SettingsPage';
+import SpotlightSearch from '@/components/SpotlightSearch';
 
 interface Service {
   id: string;
@@ -18,6 +21,7 @@ interface Service {
 }
 
 export default function Home() {
+  const [loggedIn, setLoggedIn] = useState(false);
   const [activeMenu, setActiveMenu] = useState('home');
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
@@ -215,23 +219,26 @@ export default function Home() {
     }
   };
 
+  if (!loggedIn) {
+    return <LoginScreen onLogin={() => setLoggedIn(true)} />;
+  }
+
   return (
     <div className="h-screen bg-gray-100">
       {/* Sidebar */}
-      <Sidebar activeMenu={activeMenu} />
+      <Sidebar activeMenu={activeMenu} onMenuChange={setActiveMenu} />
 
       {/* Main content décalé pour la sidebar fixe */}
-      <div className={`flex flex-col flex-1 ml-48 h-screen transition-all duration-200 ${showServiceDetails ? 'blur-sm' : ''}`}>
+      <div className={`flex flex-col flex-1 ml-14 md:ml-48 h-screen transition-all duration-200 ${showServiceDetails || activeMenu === 'settings' ? 'blur-sm' : ''}`}>
         {/* Header */}
         <Header title="E.2.A « ADMIN »ÉCRAN D'ACCUEIL" />
 
-        {/* Dashboard */}
         {loading ? (
           <div className="flex-1 flex items-center justify-center">
             <p className="text-2xl text-gray-600">Chargement des services...</p>
           </div>
         ) : (
-          <MonitoringDashboard 
+          <MonitoringDashboard
             services={services}
             onAddService={() => setShowAddModal(true)}
             onEditService={handleOpenServiceDetails}
@@ -277,6 +284,23 @@ export default function Home() {
           onClose={handleCloseServiceDetails}
           onEdit={handleEditFromDetails}
           onDelete={handleDeleteFromDetails}
+        />
+      )}
+
+      {/* Settings overlay */}
+      {activeMenu === 'settings' && (
+        <SettingsPage onClose={() => setActiveMenu('home')} />
+      )}
+
+      {/* Spotlight Search */}
+      {activeMenu === 'search' && (
+        <SpotlightSearch
+          services={services}
+          onClose={() => setActiveMenu('home')}
+          onSelectService={(service) => {
+            setActiveMenu('home');
+            handleOpenServiceDetails(service);
+          }}
         />
       )}
     </div>
