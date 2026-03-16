@@ -1,5 +1,5 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { checkUrlHealth, updateService } from '@/lib/db';
+import { checkUrlHealth, updateService, getServiceById, addHistoryEntry } from '@/lib/db';
 
 // POST /api/health - Vérifier la santé d'une URL
 export async function POST(request: NextRequest) {
@@ -16,20 +16,35 @@ export async function POST(request: NextRequest) {
 
     const { status, responseTime } = await checkUrlHealth(url);
 
-    // Si serviceId est fourni, mettre à jour le service dans la BD
+    // Si serviceId est fourni, mettre à jour le service et enregistrer dans l'historique
     if (serviceId) {
-      await updateService(serviceId, {
-        status,
-        responseTime,
-        lastCheck: new Date().toISOString(),
-      });
+      const service = await getServiceById(serviceId);
+      
+      if (service) {
+        await updateService(serviceId, {
+          status,
+          responseTime,
+          lastCheck: new Date().toISOString(),
+        });
+
+        // Enregistrer dans l'historique
+        await addHistoryEntry({
+          serviceId,
+          serviceName: service.name,
+          timestamp: new Date().toISOString(),
+          status: status === 'active' ? 'success' : 'fail',
+          responseTime,
+        });
+      }
     }
 
     return NextResponse.json({ status, responseTime });
   } catch (error) {
+    console.error('Health check error:', error);
     return NextResponse.json(
       { error: 'Failed to check health' },
       { status: 500 }
     );
   }
 }
+

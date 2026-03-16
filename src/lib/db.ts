@@ -1,7 +1,6 @@
-import fs from 'fs/promises';
-import path from 'path';
-
-const DB_PATH = path.join(process.cwd(), 'data', 'services.json');
+import { connectDB } from './mongoose';
+import ServiceModel from '@/models/Service';
+import HistoryModel from '@/models/HistoryEntry';
 
 export interface Service {
   id: string;
@@ -12,85 +11,93 @@ export interface Service {
   responseTime: number | null;
 }
 
-// Lire tous les services
-export async function getServices(): Promise<Service[]> {
-  try {
-    const data = await fs.readFile(DB_PATH, 'utf-8');
-    return JSON.parse(data);
-  } catch (error) {
-    console.error('Error reading services:', error);
-    return [];
-  }
+export interface HistoryEntry {
+  id: string;
+  serviceId: string;
+  serviceName: string;
+  timestamp: string;
+  status: 'success' | 'fail';
+  responseTime: number | null;
 }
 
-// Obtenir un service par ID
-export async function getServiceById(id: string): Promise<Service | null> {
-  const services = await getServices();
-  return services.find(s => s.id === id) || null;
-}
-
-// Créer un nouveau service
-export async function createService(
-  service: Omit<Service, 'id' | 'lastCheck' | 'responseTime'>
-): Promise<Service> {
-  const services = await getServices();
-  const newId = (Math.max(...services.map(s => parseInt(s.id))) + 1).toString();
-  
-  const newService: Service = {
-    ...service,
-    id: newId,
-    lastCheck: null,
-    responseTime: null,
+function toService(doc: Record<string, unknown>): Service {
+  return {
+    id: String(doc._id ?? doc.id),
+    name: doc.name as string,
+    url: doc.url as string,
+    status: doc.status as Service['status'],
+    lastCheck: doc.lastCheck ? new Date(doc.lastCheck as string).toISOString() : null,
+    responseTime: (doc.responseTime as number) ?? null,
   };
-
-  services.push(newService);
-  await saveServices(services);
-  return newService;
 }
 
-// Mettre à jour un service
+function toHistoryEntry(doc: Record<string, unknown>): HistoryEntry {
+  return {
+    id: String(doc._id ?? doc.id),
+    serviceId: String(doc.serviceId),
+    serviceName: doc.serviceName as string,
+    timestamp: new Date(doc.timestamp as string).toISOString(),
+    status: doc.status as HistoryEntry['status'],
+    responseTime: (doc.responseTime as number) ?? null,
+  };
+}
+
+export async function getServices(): Promise<Service[]> {
+  await connectDB();
+  const docs = await ServiceModel.find().lean();
+  return docs.map(toService);
+}
+
+export async function getServiceById(id: string): Promise<Service | null> {
+  await connectDB();
+  const doc = await ServiceModel.findById(id).lean();
+  return doc ? toService(doc as Record<string, unknown>) : null;
+}
+
+export async function createService(
+  data: Omit<Service, 'id' | 'lastCheck' | 'responseTime'>
+): Promise<Service> {
+  await connectDB();
+  const doc = await ServiceModel.create({ ...data, lastCheck: null, responseTime: null });
+  return toService(doc.toObject());
+}
+
 export async function updateService(id: string, updates: Partial<Service>): Promise<Service | null> {
-  const services = await getServices();
-  const index = services.findIndex(s => s.id === id);
-  
-  if (index === -1) return null;
-
-  const updated = { ...services[index], ...updates };
-  services[index] = updated;
-  await saveServices(services);
-  return updated;
+  await connectDB();
+  const doc = await ServiceModel.findByIdAndUpdate(id, updates, { new: true }).lean();
+  return doc ? toService(doc as Record<string, unknown>) : null;
 }
 
-// Supprimer un service
 export async function deleteService(id: string): Promise<boolean> {
-  const services = await getServices();
-  const filtered = services.filter(s => s.id !== id);
-  
-  if (filtered.length === services.length) return false;
-  
-  await saveServices(filtered);
-  return true;
+  await connectDB();
+  const result = await ServiceModel.findByIdAndDelete(id).lean();
+  return result !== null;
 }
 
-// Sauvegarder les services
-async function saveServices(services: Service[]): Promise<void> {
-  try {
-    await fs.writeFile(DB_PATH, JSON.stringify(services, null, 2));
-  } catch (error) {
-    console.error('Error saving services:', error);
-    throw error;
-  }
+export async function getServiceHistory(serviceId: string, limit = 50): Promise<HistoryEntry[]> {
+  await connectDB();
+  const docs = await HistoryModel.find({ serviceId })
+    .sort({ timestamp: -1 })
+    .limit(limit)
+    .lean();
+  return docs.map(toHistoryEntry);
 }
 
-// Vérifier la santé d'une URL
+export async function addHistoryEntry(
+  entry: Omit<HistoryEntry, 'id'>
+): Promise<HistoryEntry> {
+  await connectDB();
+  const doc = await HistoryModel.create(entry);
+  return toHistoryEntry(doc.toObject());
+}
+
 export async function checkUrlHealth(url: string): Promise<{
   status: 'active' | 'inactive';
   responseTime: number | null;
 }> {
   const startTime = Date.now();
-  
+
   try {
-    // Créer un contrôleur d'annulation avec timeout de 5 secondes
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
 
@@ -100,16 +107,12 @@ export async function checkUrlHealth(url: string): Promise<{
     });
 
     clearTimeout(timeoutId);
-    const responseTime = Date.now() - startTime;
-    
+
     return {
       status: response.ok ? 'active' : 'inactive',
-      responseTime,
+      responseTime: Date.now() - startTime,
     };
-  } catch (error) {
-    return {
-      status: 'inactive',
-      responseTime: null,
-    };
+  } catch {
+    return { status: 'inactive', responseTime: null };
   }
 }

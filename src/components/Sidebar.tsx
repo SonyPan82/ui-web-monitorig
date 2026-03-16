@@ -6,17 +6,17 @@ interface SidebarProps {
 
 export default function Sidebar({ activeMenu }: SidebarProps) {
   const menuItems = [
-    { id: 'home', label: 'Home', icon: '👤' },
-    { id: 'search', label: 'Search', icon: '🔍' },
-    { id: 'contact', label: 'Contact', icon: '📞' },
-    { id: 'settings', label: 'Settings', icon: '⚙️' },
+    { id: 'home', label: 'Home', icon: '' },
+    { id: 'search', label: 'Search', icon: '' },
+    { id: 'contact', label: 'Contact', icon: '' },
+    { id: 'settings', label: 'Settings', icon: '' },
   ];
 
   return (
-    <aside className="h-screen w-48 bg-blue-600 text-white flex flex-col items-center py-8 shadow-xl">
+    <aside className="fixed h-screen w-48 bg-blue-600 text-white flex flex-col items-center py-8 shadow-xl z-50 left-0 top-0">
       {/* Logo/Avatar */}
       <div className="w-24 h-24 bg-blue-400 rounded-full flex items-center justify-center mb-6 shadow-md">
-        <span className="text-4xl">👤</span>
+        <span className="text-4xl font-bold text-white">A</span>
       </div>
 
       {/* Menu Items */}

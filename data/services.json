@@ -4,55 +4,31 @@
     "name": "ECOLE CENTRALE",
     "url": "https://www.centralesupelec.fr",
     "status": "active",
-    "lastCheck": "2026-03-16T10:00:00Z",
-    "responseTime": 145
+    "lastCheck": "2026-03-16T19:29:23.766Z",
+    "responseTime": 97
   },
   {
     "id": "2",
     "name": "GOOGLE",
     "url": "https://www.google.com",
     "status": "active",
-    "lastCheck": "2026-03-16T10:00:00Z",
-    "responseTime": 89
+    "lastCheck": "2026-03-16T19:29:23.750Z",
+    "responseTime": 66
   },
   {
     "id": "3",
     "name": "MYSPACE",
     "url": "https://www.myspace.com",
     "status": "inactive",
-    "lastCheck": "2026-03-16T10:00:00Z",
+    "lastCheck": "2026-03-16T19:29:23.726Z",
     "responseTime": null
   },
   {
     "id": "4",
     "name": "LEROY MERLIN",
     "url": "https://www.leroymerlin.fr",
-    "status": "active",
-    "lastCheck": "2026-03-16T10:00:00Z",
-    "responseTime": 234
-  },
-  {
-    "id": "5",
-    "name": "UNKNOWN",
-    "url": "https://www.example-unknown.com",
-    "status": "unknown",
-    "lastCheck": null,
-    "responseTime": null
-  },
-  {
-    "id": "6",
-    "name": "WINDOWS PHONE",
-    "url": "https://www.windowsphone.com",
     "status": "inactive",
-    "lastCheck": "2026-03-16T10:00:00Z",
-    "responseTime": null
-  },
-  {
-    "id": "7",
-    "name": "APPLE",
-    "url": "https://www.apple.com",
-    "status": "active",
-    "lastCheck": "2026-03-16T10:00:00Z",
-    "responseTime": 112
+    "lastCheck": "2026-03-16T19:29:15.058Z",
+    "responseTime": 54
   }
-]
+]]

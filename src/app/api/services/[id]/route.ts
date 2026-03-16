@@ -1,4 +1,5 @@
 import { NextResponse, NextRequest } from 'next/server';
+import { isValidObjectId } from 'mongoose';
 import { getServiceById, updateService, deleteService } from '@/lib/db';
 
 interface RouteContext {
@@ -9,6 +10,7 @@ interface RouteContext {
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
+    if (!isValidObjectId(id)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
     const service = await getServiceById(id);
 
     if (!service) {
@@ -31,6 +33,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 export async function PUT(request: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
+    if (!isValidObjectId(id)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
     const body = await request.json();
 
     const updated = await updateService(id, body);
@@ -55,6 +58,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
 export async function DELETE(request: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
+    if (!isValidObjectId(id)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
     const deleted = await deleteService(id);
 
     if (!deleted) {
