@@ -1,22 +1,40 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Sidebar from '@/components/Sidebar';
 import Header from '@/components/Header';
 import MonitoringDashboard from '@/components/MonitoringDashboard';
 
+interface Service {
+  id: string;
+  name: string;
+  url: string;
+  status: 'active' | 'inactive' | 'unknown';
+  lastCheck: string | null;
+  responseTime: number | null;
+}
+
 export default function Home() {
   const [activeMenu, setActiveMenu] = useState('home');
+  const [services, setServices] = useState<Service[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const services = [
-    { id: '1', name: 'ECOLE CENTRALE', status: 'active' as const },
-    { id: '2', name: 'GOOGLE', status: 'active' as const },
-    { id: '3', name: 'MYSPACE', status: 'inactive' as const },
-    { id: '4', name: 'LEROY MERLIN', status: 'active' as const },
-    { id: '5', name: 'UNKNOWN', status: 'unknown' as const },
-    { id: '6', name: 'WINDOWS PHONE', status: 'inactive' as const },
-    { id: '7', name: 'APPLE', status: 'active' as const },
-  ];
+  // Récupérer les services depuis l'API
+  useEffect(() => {
+    const fetchServices = async () => {
+      try {
+        const response = await fetch('/api/services');
+        const data = await response.json();
+        setServices(data);
+      } catch (error) {
+        console.error('Error fetching services:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchServices();
+  }, []);
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -29,7 +47,13 @@ export default function Home() {
         <Header title="E.2.A « ADMIN »ÉCRAN D'ACCUEIL" />
 
         {/* Dashboard */}
-        <MonitoringDashboard services={services} />
+        {loading ? (
+          <div className="flex-1 flex items-center justify-center">
+            <p className="text-2xl text-gray-600">Chargement des services...</p>
+          </div>
+        ) : (
+          <MonitoringDashboard services={services} />
+        )}
       </div>
     </div>
   );

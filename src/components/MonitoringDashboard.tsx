@@ -3,7 +3,10 @@ import ServiceCard from './ServiceCard';
 interface Service {
   id: string;
   name: string;
+  url: string;
   status: 'active' | 'inactive' | 'unknown';
+  lastCheck: string | null;
+  responseTime: number | null;
 }
 
 interface MonitoringDashboardProps {
@@ -19,12 +22,15 @@ export default function MonitoringDashboard({ services }: MonitoringDashboardPro
             key={service.id}
             name={service.name}
             status={service.status}
+            responseTime={service.responseTime}
+            lastCheck={service.lastCheck}
           />
         ))}
         
         {/* Bouton pour ajouter un nouveau service */}
-        <button className="bg-blue-400 rounded-3xl p-8 shadow-lg min-h-32 flex flex-col justify-center items-center text-center hover:bg-blue-500 transition-colors">
+        <button className="bg-blue-400 rounded-3xl p-8 shadow-lg min-h-40 flex flex-col justify-center items-center text-center hover:bg-blue-500 transition-colors">
           <span className="text-5xl text-white font-light">+</span>
+          <p className="text-white text-sm mt-2">Ajouter un service</p>
         </button>
       </div>
     </main>
